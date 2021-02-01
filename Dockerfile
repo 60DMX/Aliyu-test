@@ -1,6 +1,6 @@
 # pull base image
 FROM ubuntu:18.04
-MAINTAINER kevin.wang <kevin.wang@104.com.tw>
+MAINTAINER kevin.wang <kevin.wang@microfusion.tw>
 
 # install squid
 RUN set -ex \
