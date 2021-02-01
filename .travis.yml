@@ -6,8 +6,8 @@ services:
 before_install:
 - chmod +x tests/*.sh
 install:
-- docker build -t sproxy-client/squid .
-- docker run -di --name squid sproxy-client/squid
+- docker build -t client/squid .
+- docker run -di --name squid client/squid
 script:
 - docker exec -it squid /tests/test_config.sh
 - docker exec -it squid /tests/test_service.sh
@@ -20,12 +20,12 @@ notifications:
 before_deploy:
 - zip -r latest-${TRAVIS_BUILD_NUMBER}.zip *
 - mkdir -p sproxy-client
-- mv latest-${TRAVIS_BUILD_NUMBER}.zip sproxy-client/latest-${TRAVIS_BUILD_NUMBER}.zip
+- mv latest-${TRAVIS_BUILD_NUMBER}.zip client/latest-${TRAVIS_BUILD_NUMBER}.zip
 deploy:
    provider: pages
   skip-cleanup: true
   github-token: $GITHUB_TOKEN
-  local-dir: public
+  local-dir: pravite
   repo: 60DMX/Aliyu-test.github.io
   target_branch: master
 
