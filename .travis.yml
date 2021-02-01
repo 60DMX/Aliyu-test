@@ -28,5 +28,8 @@ deploy:
   local-dir: public
   repo: 60DMX/Aliyu-test.github.io
   target_branch: master
-env:
-  global:
+
+after_success:
+  - git config --global user.name "kevin" 
+  - git config --global user.email "kevin.wang@microfusion.tw"
+  - sed -i'' "/^ *repo/s~github\.com~${GH_TOKEN}@github.com~" _config.yml
