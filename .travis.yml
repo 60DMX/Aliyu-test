@@ -1,0 +1,50 @@
+language: python
+python:
+- '2.7'
+services:
+- docker
+before_install:
+- chmod +x tests/*.sh
+install:
+- docker build -t 104isgd-new-sproxy-client/squid .
+- docker run -di --name squid 104isgd-new-sproxy-client/squid
+script:
+- docker exec -it squid /tests/test_config.sh
+- docker exec -it squid /tests/test_service.sh
+notifications:
+  email:
+    recipients:
+    - kevin.wang@microfusion.tw
+    on_success: change
+    on_failure: always
+before_deploy:
+- zip -r latest-${TRAVIS_BUILD_NUMBER}.zip *
+- mkdir -p 104isgd-new-sproxy-client
+- mv latest-${TRAVIS_BUILD_NUMBER}.zip 104isgd-new-sproxy-client/latest-${TRAVIS_BUILD_NUMBER}.zip
+deploy:
+   provider: pages
+  skip-cleanup: true
+  github-token: $GITHUB_TOKEN
+  local-dir: public
+  repo: 60DMX/Aliyu-test.github.io
+  target_branch: master
+#- provider: s3
+#  access_key_id: "$AWS_ACCESS_KEY_ID"
+#  secret_access_key: "$AWS_SECRET_ACCESS_KEY"
+#  bucket: 104isgd-new-sproxy-client
+#  skip_cleanup: true
+#  local_dir: 104isgd-new-sproxy-client
+#  region: ap-northeast-1
+#  on:
+#    branch: master
+#- provider: codedeploy
+#  access_key_id: "$AWS_ACCESS_KEY_ID_1"
+#  secret_access_key: "$AWS_SECRET_ACCESS_KEY_1"
+#  bucket: 104isgd-new-sproxy-client
+#  key: latest-${TRAVIS_BUILD_NUMBER}.zip
+#  region: ap-northeast-1
+#  bundle_type: zip
+#  application: new-client-proxy-app
+#  deployment_group: new-client-proxy-group
+env:
+  global:
