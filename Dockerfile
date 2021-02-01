@@ -10,4 +10,3 @@ RUN set -ex \
 COPY . /
 RUN cp squid.conf /etc/squid/.
 RUN /etc/init.d/squid start
-
