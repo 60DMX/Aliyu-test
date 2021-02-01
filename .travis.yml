@@ -25,7 +25,7 @@ deploy:
    provider: pages
   skip-cleanup: true
   github-token: $GITHUB_TOKEN
-  local-dir: pravite
+  local-dir: public
   repo: 60DMX/Aliyu-test.github.io
   target_branch: master
 
