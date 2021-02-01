@@ -1,8 +1,19 @@
-language: node_js
-node_js:
-  - "8"
+language: python
+python:
+- '2.7'
+services:
+- docker
+before_install:
+- chmod +x tests/*.sh
 install:
-    - npm install
+- docker build -t client/squid .
+- docker run -di --name squid client/squid
 script:
-    - npm run clean
-    - npm run build
+- docker exec -it squid /tests/test_config.sh
+- docker exec -it squid /tests/test_service.sh
+notifications:
+  email:
+    recipients:
+    - kevin.wang@microfusion.com.tw
+    on_success: change
+    on_failure: always
