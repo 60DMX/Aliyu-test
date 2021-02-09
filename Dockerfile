@@ -4,7 +4,7 @@ MAINTAINER kevin.wang <kevin.wang@microfusion.tw>
 
 # install squid
 RUN set -ex \
-      && apt-get update && apt-get install -y squid && apt-get install -y curl
+      && apt-get update && apt-get install -y squid && apt-get install -y curl && apt-get install -y wget
 
 # init
 COPY . /
