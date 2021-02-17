@@ -29,5 +29,3 @@ node{
         break
     }
 }
-# Dockerfile
-FROM squid
