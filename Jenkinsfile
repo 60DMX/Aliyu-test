@@ -1,106 +1,75 @@
-#!/usr/bin/env groovy
-pipeline {
+pipeline{
+      // 定义groovy脚本中使用的环境变量
+      environment{
+        // 本示例中使用DEPLOY_TO_K8S变量来决定把应用部署到哪套容器集群环境中，如“Production Environment”， “Staging001 Environment”等
+        IMAGE_TAG =  sh(returnStdout: true,script: 'echo $image_tag').trim()
+        ORIGIN_REPO =  sh(returnStdout: true,script: 'echo $origin_repo').trim()
+        REPO =  sh(returnStdout: true,script: 'echo $repo').trim()
+        BRANCH =  sh(returnStdout: true,script: 'echo $branch').trim()
+        API_SERVER_URL = sh(returnStdout: true,script: 'echo $api_server_url').trim()
+      }
 
-    /*
-     * Run everything on an existing agent configured with a label 'docker'.
-     * This agent will need docker, git and a jdk installed at a minimum.
-     */
-    agent {
-        node {
-            label 'docker'
+      // 定义本次构建使用哪个标签的构建环境，本示例中为 “slave-pipeline”
+      agent{
+        node{
+          label 'slave-pipeline'
         }
-    }
+      }
 
-    // using the Timestamper plugin we can add timestamps to the console log
-    options {
-        timestamps()
-    }
-
-    environment {
-        //Use Pipeline Utility Steps plugin to read information from pom.xml into env variables
-        IMAGE = readMavenPom().getArtifactId()
-        VERSION = readMavenPom().getVersion()
-    }
-
-    stages {
-        stage('Build') {
-            agent {
-                docker {
-                    /*
-                     * Reuse the workspace on the agent defined at top-level of Pipeline but run inside a container.
-                     * In this case we are running a container with maven so we don't have to install specific versions
-                     * of maven directly on the agent
-                     */
-                    reuseNode true
-                    image 'maven:3.5.0-jdk-8'
-                }
-            }
-            steps {
-                // using the Pipeline Maven plugin we can set maven configuration settings, publish test results, and annotate the Jenkins console
-                withMaven(options: [findbugsPublisher(), junitPublisher(ignoreAttachments: false)]) {
-                    sh 'mvn clean findbugs:findbugs package'
-                }
-            }
-            post {
-                success {
-                    // we only worry about archiving the jar file if the build steps are successful
-                    archiveArtifacts(artifacts: '**/target/*.jar', allowEmptyArchive: true)
-                }
-            }
+      // "stages"定义项目构建的多个模块，可以添加多个 “stage”， 可以多个 “stage” 串行或者并行执行
+      stages{
+    // 定义第一个stage， 完成克隆源码的任务
+        stage('Git'){
+          steps{
+            git branch: '${BRANCH}', credentialsId: '', url: 'https://github.com/60DMX/Aliyu-test.git'
+          }
         }
 
-        stage('Quality Analysis') {
+    // 添加第二个stage， 运行源码打包命令
+        stage('Package'){
+          steps{
+              container("maven") {
+                  sh "mvn package -B -DskipTests"
+              }
+          }
+        }
+
+    // 添加第三个stage, 运行容器镜像构建和推送命令， 用到了environment中定义的groovy环境变量
+        stage('Image Build And Publish'){
+          steps{
+              container("kaniko") {
+                  sh "kaniko -f `pwd`/Dockerfile -c `pwd` --destination=${ORIGIN_REPO}/${REPO}:${IMAGE_TAG}"
+              }
+          }
+        }
+
+        stage('Deploy to Kubernetes') {
             parallel {
-                // run Sonar Scan and Integration tests in parallel. This syntax requires Declarative Pipeline 1.2 or higher
-                stage('Integration Test') {
-                    agent any  //run this stage on any available agent
-                    steps {
-                        echo 'Run integration tests here...'
-                    }
-                }
-                stage('Sonar Scan') {
-                    agent {
-                        docker {
-                            // we can use the same image and workspace as we did previously
-                            reuseNode true
-                            image 'maven:3.5.0-jdk-8'
+                stage('Deploy to Production Environment') {
+                    when {
+                        expression {
+                            "$BRANCH" == "serverless"
                         }
                     }
-                    environment {
-                        //use 'sonar' credentials scoped only to this stage
-                        SONAR = credentials('sonar')
+                    steps {
+            container('kubectl') {
+                step([$class: 'KubernetesDeploy', authMethod: 'certs', apiServerUrl: '$API_SERVER_URL', credentialsId:'k8sCertAuth', config: 'deployment.yaml',variableState: 'ORIGIN_REPO,REPO,IMAGE_TAG'])
+            }
+                    }
+                }
+                stage('Deploy to Staging001 Environment') {
+                    when {
+                        expression {
+                            "$BRANCH" == "latest"
+                        }
                     }
                     steps {
-                        sh 'mvn sonar:sonar -Dsonar.login=$SONAR_PSW'
+            container('kubectl') {
+                step([$class: 'KubernetesDeploy', authMethod: 'certs', apiServerUrl: '$API_SERVER_URL', credentialsId:'k8sCertAuth', config: 'deployment.yaml',variableState: 'ORIGIN_REPO,REPO,IMAGE_TAG'])
+            }
                     }
                 }
             }
         }
-
-        stage('Build and Publish Image') {
-            when {
-                branch 'master'  //only run these steps on the master branch
-            }
-            steps {
-                /*
-                 * Multiline strings can be used for larger scripts. It is also possible to put scripts in your shared library
-                 * and load them with 'libaryResource'
-                 */
-                sh """
-          docker build -t ${IMAGE} .
-          docker tag ${IMAGE} ${IMAGE}:${VERSION}
-          docker push ${IMAGE}:${VERSION}
-        """
-            }
-        }
-    }
-
-    post {
-        failure {
-            // notify users when the Pipeline fails
-            mail to: 'team@example.com',
-                    subject: "Failed Pipeline: ${currentBuild.fullDisplayName}",
-                    body: "Something is wrong with ${env.BUILD_URL}"
-        }
-    }
+      }
 }
